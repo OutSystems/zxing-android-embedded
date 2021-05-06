@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
 
 import androidx.annotation.NonNull;
 
@@ -24,8 +25,10 @@ public class CustomScannerActivity extends Activity implements
 
     private CaptureManager capture;
     private DecoratedBarcodeView barcodeScannerView;
-    private Button switchFlashlightButton;
+    private ImageButton switchFlashlightButton;
     private ViewfinderView viewfinderView;
+    private boolean flashlightOn=false;
+    private boolean isScanning=false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,10 +51,10 @@ public class CustomScannerActivity extends Activity implements
         capture = new CaptureManager(this, barcodeScannerView);
         capture.initializeFromIntent(getIntent(), savedInstanceState);
         capture.setShowMissingCameraPermissionDialog(false);
-        capture.decode();
 
         changeMaskColor(null);
         changeLaserVisibility(true);
+
     }
 
     @Override
@@ -92,17 +95,24 @@ public class CustomScannerActivity extends Activity implements
                 .hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
     }
 
+    public void scan(View view) {
+        capture.decode();
+    }
+
+    public void closeScreen(View view) {
+        this.finish();
+    }
+
     public void switchFlashlight(View view) {
-        if (getString(R.string.turn_on_flashlight).equals(switchFlashlightButton.getText())) {
-            barcodeScannerView.setTorchOn();
-        } else {
+        if (flashlightOn) {
             barcodeScannerView.setTorchOff();
+        } else {
+            barcodeScannerView.setTorchOn();
         }
     }
 
     public void changeMaskColor(View view) {
-        Random rnd = new Random();
-        int color = Color.argb(100, rnd.nextInt(256), rnd.nextInt(256), rnd.nextInt(256));
+        int color = Color.argb(100, 0, 0, 0);
         viewfinderView.setMaskColor(color);
     }
 
@@ -112,12 +122,14 @@ public class CustomScannerActivity extends Activity implements
 
     @Override
     public void onTorchOn() {
-        switchFlashlightButton.setText(R.string.turn_off_flashlight);
+        flashlightOn = true;
+        //barcodeScannerView.setTorchOn();
     }
 
     @Override
     public void onTorchOff() {
-        switchFlashlightButton.setText(R.string.turn_on_flashlight);
+        flashlightOn = false;
+        //barcodeScannerView.setTorchOff();
     }
 
     @Override

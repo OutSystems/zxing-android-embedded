@@ -21,11 +21,19 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.Shader;
 import android.util.AttributeSet;
 import android.view.View;
+
+import androidx.core.content.ContextCompat;
 
 import com.google.zxing.ResultPoint;
 import com.google.zxing.client.android.R;
@@ -48,6 +56,14 @@ public class ViewfinderView extends View {
     protected static final int MAX_RESULT_POINTS = 20;
     protected static final int POINT_SIZE = 6;
 
+    //border
+    protected Paint mBorderPaint;
+    protected int mBorderLineLength;
+    private final int mDefaultBorderColor = ContextCompat.getColor(this.getContext(), android.R.color.white);
+    private final int mDefaultBorderStrokeWidth = 5;
+    private final int mDefaultBorderLineLength = 120;
+    private final int mDefaultBorderDistance = 30;
+
     protected final Paint paint;
     protected Bitmap resultBitmap;
     protected int maskColor;
@@ -59,6 +75,17 @@ public class ViewfinderView extends View {
     protected List<ResultPoint> possibleResultPoints;
     protected List<ResultPoint> lastPossibleResultPoints;
     protected CameraPreview cameraPreview;
+
+    private int endY = 0;
+    private boolean slidingDown = true;
+
+    private Paint paint2 = new Paint(Paint.ANTI_ALIAS_FLAG) {
+        {
+            setDither(true);
+            setStrokeWidth(3);
+            setColor(Color.WHITE);
+        }
+    };
 
     // Cache the framingRect and previewSize, so that we can still draw it after the preview
     // stopped.
@@ -86,13 +113,22 @@ public class ViewfinderView extends View {
         this.resultPointColor = attributes.getColor(R.styleable.zxing_finder_zxing_possible_result_points,
                 resources.getColor(R.color.zxing_possible_result_points));
         this.laserVisibility = attributes.getBoolean(R.styleable.zxing_finder_zxing_viewfinder_laser_visibility,
-                true);
+                false);
 
         attributes.recycle();
 
         scannerAlpha = 0;
         possibleResultPoints = new ArrayList<>(MAX_RESULT_POINTS);
         lastPossibleResultPoints = new ArrayList<>(MAX_RESULT_POINTS);
+
+        //border paint
+        mBorderPaint = new Paint();
+        mBorderPaint.setColor(mDefaultBorderColor);
+        mBorderPaint.setStyle(Paint.Style.STROKE);
+        mBorderPaint.setStrokeWidth(mDefaultBorderStrokeWidth);
+        mBorderPaint.setAntiAlias(true);
+
+        mBorderLineLength = mDefaultBorderLineLength;
     }
 
     public void setCameraPreview(CameraPreview view) {
@@ -135,6 +171,7 @@ public class ViewfinderView extends View {
         if (framingRect != null && previewSize != null) {
             this.framingRect = framingRect;
             this.previewSize = previewSize;
+
         }
     }
 
@@ -184,8 +221,8 @@ public class ViewfinderView extends View {
                 float radius = POINT_SIZE / 2.0f;
                 for (final ResultPoint point : lastPossibleResultPoints) {
                     canvas.drawCircle(
-                             (int) (point.getX() * scaleX),
-                             (int) (point.getY() * scaleY),
+                            (int) (point.getX() * scaleX),
+                            (int) (point.getY() * scaleY),
                             radius, paint
                     );
                 }
@@ -213,12 +250,69 @@ public class ViewfinderView extends View {
 
             // Request another update at the animation interval, but only repaint the laser line,
             // not the entire viewfinder mask.
-            postInvalidateDelayed(ANIMATION_DELAY,
+            /*postInvalidateDelayed(ANIMATION_DELAY,
                     frame.left - POINT_SIZE,
                     frame.top - POINT_SIZE,
                     frame.right + POINT_SIZE,
-                    frame.bottom + POINT_SIZE);
+                    frame.bottom + POINT_SIZE);*/
+
         }
+
+        drawViewFinderBorder(canvas);
+
+        if (endY == 0) {
+            endY = framingRect.top;
+            slidingDown = true;
+        }
+
+        paint2.setStrokeWidth(5);
+        //paint2.setShader(new LinearGradient(0, 0, 0, getHeight(), Color.WHITE, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+        //canvas.drawPath(arrowPath, paint);
+
+        canvas.drawLine(framingRect.left, endY, framingRect.right, endY, paint2);
+
+        if (endY != framingRect.bottom && slidingDown) { // set end points
+            endY = endY + 2;
+        } else if (endY == framingRect.bottom) {
+            slidingDown = false;
+            endY = endY - 2;
+        } else if (endY != framingRect.top && !slidingDown) {
+            endY = endY - 2;
+        } else if (endY == framingRect.top) {
+            slidingDown = true;
+            endY = endY + 2;
+        }
+
+        postInvalidate();
+        //postInvalidateDelayed(0); // set time here
+    }
+
+    public void drawViewFinderBorder(Canvas canvas) {
+
+        // Top-left corner
+        Path path = new Path();
+        path.moveTo(framingRect.left - mDefaultBorderDistance, framingRect.top + mBorderLineLength);
+        path.lineTo(framingRect.left - mDefaultBorderDistance, framingRect.top - mDefaultBorderDistance);
+        path.lineTo(framingRect.left + mBorderLineLength, framingRect.top - mDefaultBorderDistance);
+        canvas.drawPath(path, mBorderPaint);
+
+        // Top-right corner
+        path.moveTo(framingRect.right + mDefaultBorderDistance , framingRect.top + mBorderLineLength);
+        path.lineTo(framingRect.right + mDefaultBorderDistance, framingRect.top - mDefaultBorderDistance);
+        path.lineTo(framingRect.right - mBorderLineLength, framingRect.top - mDefaultBorderDistance);
+        canvas.drawPath(path, mBorderPaint);
+
+        // Bottom-right corner
+        path.moveTo(framingRect.right + mDefaultBorderDistance, framingRect.bottom - mBorderLineLength);
+        path.lineTo(framingRect.right + mDefaultBorderDistance, framingRect.bottom + mDefaultBorderDistance);
+        path.lineTo(framingRect.right - mBorderLineLength, framingRect.bottom + mDefaultBorderDistance);
+        canvas.drawPath(path, mBorderPaint);
+
+        // Bottom-left corner
+        path.moveTo(framingRect.left - mDefaultBorderDistance, framingRect.bottom - mBorderLineLength);
+        path.lineTo(framingRect.left - mDefaultBorderDistance, framingRect.bottom + mDefaultBorderDistance);
+        path.lineTo(framingRect.left + mBorderLineLength, framingRect.bottom + mDefaultBorderDistance);
+        canvas.drawPath(path, mBorderPaint);
     }
 
     public void drawViewfinder() {
@@ -255,6 +349,6 @@ public class ViewfinderView extends View {
     }
 
     public void setLaserVisibility(boolean visible) {
-        this.laserVisibility = visible;
+        this.laserVisibility = false;
     }
 }
