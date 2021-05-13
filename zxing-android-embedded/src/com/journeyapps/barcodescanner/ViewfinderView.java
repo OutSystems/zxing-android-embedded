@@ -16,12 +16,10 @@
 
 package com.journeyapps.barcodescanner;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
@@ -77,12 +75,17 @@ public class ViewfinderView extends View {
     protected CameraPreview cameraPreview;
 
     private int endY = 0;
-    private boolean slidingDown = true;
+    private int endYGradientTop = 0;
+    private int shadeDirection = 0;
+    private int scanLineSpeed = 2;
 
-    private Paint paint2 = new Paint(Paint.ANTI_ALIAS_FLAG) {
+    private boolean slidingDown = true;
+    Path mPath;
+
+    private Paint paintScanLine = new Paint(Paint.ANTI_ALIAS_FLAG) {
         {
             setDither(true);
-            setStrokeWidth(3);
+            setStrokeWidth(2);
             setColor(Color.WHITE);
         }
     };
@@ -200,16 +203,6 @@ public class ViewfinderView extends View {
             paint.setAlpha(CURRENT_POINT_OPACITY);
             canvas.drawBitmap(resultBitmap, null, frame, paint);
         } else {
-            // If wanted, draw a red "laser scanner" line through the middle to show decoding is active
-            if (laserVisibility) {
-                paint.setColor(laserColor);
-
-                paint.setAlpha(SCANNER_ALPHA[scannerAlpha]);
-                scannerAlpha = (scannerAlpha + 1) % SCANNER_ALPHA.length;
-
-                final int middle = frame.height() / 2 + frame.top;
-                canvas.drawRect(frame.left + 2, middle - 1, frame.right - 1, middle + 2, paint);
-            }
 
             final float scaleX = this.getWidth() / (float) previewSize.width;
             final float scaleY = this.getHeight() / (float) previewSize.height;
@@ -260,31 +253,61 @@ public class ViewfinderView extends View {
 
         drawViewFinderBorder(canvas);
 
-        if (endY == 0) {
-            endY = framingRect.top;
-            slidingDown = true;
-        }
-
-        paint2.setStrokeWidth(5);
-        //paint2.setShader(new LinearGradient(0, 0, 0, getHeight(), Color.WHITE, Color.TRANSPARENT, Shader.TileMode.CLAMP));
-        //canvas.drawPath(arrowPath, paint);
-
-        canvas.drawLine(framingRect.left, endY, framingRect.right, endY, paint2);
-
-        if (endY != framingRect.bottom && slidingDown) { // set end points
-            endY = endY + 2;
-        } else if (endY == framingRect.bottom) {
-            slidingDown = false;
-            endY = endY - 2;
-        } else if (endY != framingRect.top && !slidingDown) {
-            endY = endY - 2;
-        } else if (endY == framingRect.top) {
-            slidingDown = true;
-            endY = endY + 2;
+        if (laserVisibility) {
+            drawScanLine(canvas);
         }
 
         postInvalidate();
-        //postInvalidateDelayed(0); // set time here
+    }
+
+    public void drawScanLine(Canvas canvas) {
+
+        if (endY == 0) {
+            endY = framingRect.top;
+            endYGradientTop = framingRect.top;
+            slidingDown = true;
+        }
+
+        if (slidingDown) {
+            Shader shader = new LinearGradient(0,endYGradientTop - 40, 0, endYGradientTop + shadeDirection,Color.TRANSPARENT, Color.WHITE, Shader.TileMode.MIRROR);
+            Paint paint = new Paint();
+            paint.setShader(shader);
+            paint.setAlpha(100);
+            canvas.drawRect(new RectF(framingRect.left, endYGradientTop - 40, framingRect.right, endYGradientTop + shadeDirection), paint);
+        } else {
+            Shader shader = new LinearGradient(0,endYGradientTop, 0, endYGradientTop + 40,Color.WHITE, Color.TRANSPARENT, Shader.TileMode.MIRROR);
+            Paint paint = new Paint();
+            paint.setShader(shader);
+            paint.setAlpha(100);
+            canvas.drawRect(new RectF(framingRect.left, endYGradientTop, framingRect.right, endYGradientTop + 40), paint);
+        }
+
+        // you need to use speed 1 when you are close to the edges
+        if ((endY > framingRect.bottom - 20) && (endY < framingRect.bottom + 20)) {
+            scanLineSpeed = 1;
+        } else if ((endY > framingRect.top - 20) && (endY < framingRect.top + 20)) {
+            scanLineSpeed = 1;
+        } else {
+            scanLineSpeed = 3;
+        }
+
+        canvas.drawLine(framingRect.left, endY, framingRect.right, endY, paintScanLine);
+
+        if (endY != framingRect.bottom && slidingDown) { // set end points
+            endY = endY + scanLineSpeed;
+            endYGradientTop = endYGradientTop + scanLineSpeed;
+        } else if (endY == framingRect.bottom) {
+            slidingDown = false;
+            endY = endY - scanLineSpeed;
+            endYGradientTop = endYGradientTop - scanLineSpeed;
+        } else if (endY != framingRect.top && !(slidingDown)) {
+            endY = endY - scanLineSpeed;
+            endYGradientTop = endYGradientTop - scanLineSpeed;
+        } else if (endY == framingRect.top) {
+            slidingDown = true;
+            endYGradientTop = endYGradientTop + scanLineSpeed;
+            endY = endY + scanLineSpeed;
+        }
     }
 
     public void drawViewFinderBorder(Canvas canvas) {
@@ -349,6 +372,6 @@ public class ViewfinderView extends View {
     }
 
     public void setLaserVisibility(boolean visible) {
-        this.laserVisibility = false;
+        this.laserVisibility = visible;
     }
 }
