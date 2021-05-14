@@ -78,9 +78,7 @@ public class ViewfinderView extends View {
     private int endYGradientTop = 0;
     private int shadeDirection = 0;
     private int scanLineSpeed = 2;
-
     private boolean slidingDown = true;
-    Path mPath;
 
     private Paint paintScanLine = new Paint(Paint.ANTI_ALIAS_FLAG) {
         {
