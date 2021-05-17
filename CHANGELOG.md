@@ -1,3 +1,7 @@
+
+### 4.2.0 (2021-05-17)
+Changed the scan line to move up and down and added target to the read area(https://outsystemsrd.atlassian.net/browse/RMET-722)
+
 ### 4.1.0 (2020-01-07)
 
 * Ability to hide the laser in ViewfinderView (#503).
